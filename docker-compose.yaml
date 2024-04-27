@@ -1,0 +1,29 @@
+version: '3'
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    volumes:
+      - ./backend/:/src/
+    ports:
+      - 8000:8000
+    command: uvicorn myapp.web_api:combined_app --host 0.0.0.0 --port 8000 --reload
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      # management gui (not for production!)
+      - 15672:15672
+    environment:
+      - RABBITMQ_DEFAULT_USER=rabbit
+      - RABBITMQ_DEFAULT_PASS=rabbit
+      - RABBITMQ_DEFAULT_VHOST=default
+  redis:
+    image: redis:latest
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    volumes:
+      - ./backend/:/src/
+    command: celery -A myapp.tasks worker --loglevel=INFO

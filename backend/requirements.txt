@@ -1,0 +1,9 @@
+ipython
+fastapi[all]
+python-socketio
+python-dotenv
+httpx
+celery
+uvicorn
+pydantic
+redis

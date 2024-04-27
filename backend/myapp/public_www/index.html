@@ -1,0 +1,103 @@
+<html>
+<head>
+  <title>Celery, SocketIO, Redis, Rabbit, and FastAPI</title>
+  <style>
+  * {
+    /* haxxor mode */
+    font-family: monospace;
+    background-color: #010101;
+    color: lightgreen;
+  }
+  </style>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"
+          integrity="sha384-2huaZvOR9iDzHqslqwpR87isEmrfxqyWOF7hr7BY6KG0+hVKLoEXMPUJw3ynWuhO" 
+          crossorigin="anonymous"></script>
+</head>
+<body>
+  <textarea id="tasks" rows="20" disabled style="width: 100%; border: 1px solid lightgreen"></textarea>
+  <textarea id="tasks-log" rows="20" disabled style="width: 100%; border: 1px solid lightgreen"></textarea>
+  <button id="create-task">CREATE TASK</button>
+  <script>
+    const socket = io('ws://localhost:8000/', {
+        // path: '/ws',
+        transports: ['websocket'],
+        /* FOR AUTHENTICATION: */
+        // extraHeaders: {
+        //     authorization: `bearer ${myToken}`
+        // },
+    });
+    const tasks = [];
+
+    const tasksElement = document.getElementById("tasks");
+    const tasksLog = document.getElementById("tasks-log");
+    const createTaskButton = document.getElementById("create-task");
+
+    createTaskButton.addEventListener("click", () => {
+      // socket.emit("create_task", { task: "tasks.add", args: [1, 2] });
+      // ^ this could be a nice addition ... but we'll stick to the REST api for now:
+
+      const url = 'http://localhost:8000/taskrun/tasks';
+      log(`Creating task at ${url}`);
+      fetch(url, {
+        method: 'POST',
+        headers: {
+          // 'Authorization': `Bearer ${myToken}` 
+          'Content-Type': 'application/json',
+        },
+      })
+    });
+
+    tasksElement.value = "loading...";
+
+    const log = (message) => {
+      tasksLog.value += `${message}\n`;
+    };
+
+    const formattedTasks = () => {
+        // return JSON.stringify(tasks, null, 2);
+        return tasks.map(t => `${t.id} - ${t.status}`).join("\n");
+    };
+
+    const updateTasksElement = () => {
+      tasksElement.value = formattedTasks();
+    };
+
+    socket.on("connect", () => {
+      log(`Connected to the server - ${socket.id}`);
+    });
+
+    socket.on("connect_error", (error) => {
+      log("Failed to connect to the server: " + error);
+    });
+
+    socket.on("message", (data) => {
+      log("Received data");
+    });
+
+    socket.on("initial_data", (data) => {
+        log("Received initial data");
+        tasks.push( ...data );
+        updateTasksElement();
+    });
+
+    socket.on("task_update", (data) => {
+        const { task_id, status } = data;
+        log("Received task_update event");
+        const t = tasks.find(t => t.id === task_id);
+        t.status = status;
+        console.log("Task updated", t, data);
+        updateTasksElement();
+    });
+
+    socket.on("task_created", (data) => {
+        log("Received task_created event");
+        tasks.push(data);
+        updateTasksElement();
+    });
+
+    socket.on("disconnect", () => {
+      log("Disconnected from the server");
+    });
+  </script>
+</body>
+</html>
