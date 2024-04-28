@@ -45,17 +45,29 @@ def async_result_to_dict(async_result: AsyncResult) -> dict:
     """
     the `AsyncResult` object is not serializable, so we need to convert it:
     """
+    try:
+        result = str(async_result.result)
+    except Exception as e:
+        result = str(e)
     return {
         "task_id": async_result.task_id,
         "status": async_result.status,
         "date_done": async_result.date_done.isoformat() if async_result.date_done else None,
-        "result": async_result.result,
+        "result": result,
     }
 
 async def clear_user_tasks(user_id: int):
     """
+    remove all the tasks for the user.
     """
     await redis_cli.delete(f"user:{user_id}:tasks")
+
+
+async def remove_user_task(user_id: int, task_id: str):
+    """
+    remove a specific task for the user.
+    """
+    await redis_cli.srem(f"user:{user_id}:tasks", task_id)
 
 
 @app.post("/taskrun/tasks")
@@ -89,6 +101,34 @@ async def add_task() -> dict:
     return {"task_id": task_id}
 
 
+@app.delete("/taskrun/tasks/{task_id}")
+async def remove_task(task_id: str) -> dict:
+    """
+    this is an example endpoint where clients may remove tasks.
+    normally we'd use the tokens / cookies to authenticate the authorize this request.
+    here we'll pretend that the user is authenticated and his user ID is equal to `42`.
+    """
+    user_id: int = 42
+    await remove_user_task(user_id, task_id)
+    room_name = f"user:{user_id}"
+    await sio.emit("task_removed", {"task_id": task_id}, room=room_name)
+    return {"task_id": None}
+
+
+@app.delete("/taskrun/tasks")
+async def clear_tasks() -> dict:
+    """
+    this is an example endpoint where clients may remove all the tasks.
+    normally we'd use the tokens / cookies to authenticate the authorize this request.
+    here we'll pretend that the user is authenticated and his user ID is equal to `42`.
+    """
+    user_id: int = 42
+    await clear_user_tasks(user_id)
+    room_name = f"user:{user_id}"
+    await sio.emit("tasks_cleared", room=room_name)
+    return {"task_id": None}
+
+
 @sio.on("connect")
 async def handle_connect(sid, environ):
     print(f"Client {sid} connected", flush=True)
@@ -104,6 +144,7 @@ async def handle_connect(sid, environ):
         async_result_to_dict(AsyncResult(task_id))
         for task_id in task_ids
     ]
+    print(initial_data, flush=True)
     await sio.emit("initial_data", initial_data, room=room_name)
 
 

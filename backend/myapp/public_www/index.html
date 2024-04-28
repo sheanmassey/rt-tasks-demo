@@ -8,15 +8,65 @@
     background-color: #010101;
     color: lightgreen;
   }
+  button {
+    background-color: lightgreen;
+    color: black;
+    border: 1px solid lightgreen;
+    cursor: pointer;
+    padding: 0.5rem;
+    margin: .5rem;
+  }
+  .delete-button {
+    background-color: red;
+    color: white;
+    border: 1px solid red;
+    cursor: pointer;
+    padding: 0.5rem;
+    margin: .5rem;
+  }
+  .delete-buttons-group {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+   }
+  textarea {
+        padding: .5rem;
+        margin: .5rem;
+  }
+  button.STARTED {
+        background-color: lightblue;
+        color: black;
+  }
+  button.SUCCESS {
+        background-color: lightgreen;
+        color: black;
+  }
+  button.PENDING {
+        background-color: lightyellow;
+        color: black;
+  }
+  button.FAILURE {
+        background-color: red;
+        color: white;
+  }
+  button.RETRY {
+        background-color: orange;
+        color: black;
+  }
   </style>
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"
           integrity="sha384-2huaZvOR9iDzHqslqwpR87isEmrfxqyWOF7hr7BY6KG0+hVKLoEXMPUJw3ynWuhO" 
           crossorigin="anonymous"></script>
 </head>
 <body>
+  <button id="create-task" style="padding: 1rem">CREATE TASK</button>
+  <button id="clear-tasks" style="padding: 1rem">CLEAR TASKS</button>
+  <div id="delete-buttons-group"></div>
+  <!--
   <textarea id="tasks" rows="20" disabled style="width: 100%; border: 1px solid lightgreen"></textarea>
+  -->
   <textarea id="tasks-log" rows="20" disabled style="width: 100%; border: 1px solid lightgreen"></textarea>
-  <button id="create-task">CREATE TASK</button>
+
   <script>
     const socket = io('ws://localhost:8000/', {
         // path: '/ws',
@@ -28,7 +78,6 @@
     });
     const tasks = [];
 
-    const tasksElement = document.getElementById("tasks");
     const tasksLog = document.getElementById("tasks-log");
     const createTaskButton = document.getElementById("create-task");
 
@@ -47,10 +96,10 @@
       })
     });
 
-    tasksElement.value = "loading...";
 
     const log = (message) => {
       tasksLog.value += `${message}\n`;
+      tasksLog.scrollTop = tasksLog.scrollHeight;
     };
 
     const formattedTasks = () => {
@@ -59,9 +108,54 @@
         return tasks.map(t => `${t.task_id} - ${t.status}`).join("\n");
     };
 
-    const updateTasksElement = () => {
-      tasksElement.value = formattedTasks();
+    const clearTask = (task_id) => {
+        const url = `http://localhost:8000/taskrun/tasks/${task_id}`;
+        log(`Deleting task at ${url}`);
+        fetch(url, {
+            method: 'DELETE',
+            headers: {
+                // 'Authorization': `Bearer ${myToken}` 
+                'Content-Type': 'application/json',
+            },
+        });
     };
+
+    const getTaskById = (task_id) => {
+        return tasks.find(t => t.task_id === task_id);
+    };
+
+    const createClearTaskButton = (task_id) => {
+        const button = document.createElement("button");
+        const t = getTaskById(task_id);
+        const shortTaskId = task_id.slice(5, 13);
+        button.innerText = `CLEAR TASK ${shortTaskId} | ${t.status}`;
+        button.classList.add(t.status);
+        button.addEventListener("click", () => {
+            clearTask(task_id);
+        });
+        return button;
+    };
+
+    const createClearTaskButtons = (tasks) => {
+        const deleteButtonsGroup = document.getElementById("delete-buttons-group");
+        deleteButtonsGroup.innerHTML = "";
+        tasks.forEach(t => {
+            const button = createClearTaskButton(t.task_id);
+            deleteButtonsGroup.appendChild(button);
+        });
+    };
+
+    document.getElementById("clear-tasks").addEventListener("click", () => {
+        const url = 'http://localhost:8000/taskrun/tasks';
+        log(`Clearing tasks at ${url}`);
+        fetch(url, {
+            method: 'DELETE',
+            headers: {
+                // 'Authorization': `Bearer ${myToken}` 
+                'Content-Type': 'application/json',
+            },
+        });
+    });
 
     socket.on("connect", () => {
       log(`Connected to the server - ${socket.id}`);
@@ -80,7 +174,7 @@
         // tasks = [ ...data ];
         tasks.length = 0;
         tasks.push( ...data );
-        updateTasksElement();
+        createClearTaskButtons(tasks);
     });
 
     socket.on("task_update", (data) => {
@@ -89,13 +183,27 @@
         const t = tasks.find(t => t.task_id === task_id);
         t.status = status;
         console.log("Task updated", t, data);
-        updateTasksElement();
+        createClearTaskButtons(tasks);
+    });
+
+    socket.on("task_removed", (data) => {
+        log("Received task_deleted event");
+        const { task_id } = data;
+        const index = tasks.findIndex(t => t.task_id === task_id);
+        tasks.splice(index, 1);
+        createClearTaskButtons(tasks);
+    });
+
+    socket.on("tasks_cleared", () => {
+        log("Received tasks_cleared event");
+        tasks.length = 0;
+        createClearTaskButtons(tasks);
     });
 
     socket.on("task_created", (data) => {
         log("Received task_created event");
         tasks.push(data);
-        updateTasksElement();
+        createClearTaskButtons(tasks);
     });
 
     socket.on("disconnect", () => {
