@@ -9,15 +9,15 @@ services:
     ports:
       - 8000:8000
     command: uvicorn myapp.web_api:combined_app --host 0.0.0.0 --port 8000 --reload
-  rabbitmq:
-    image: rabbitmq:3-management
-    ports:
-      # management gui (not for production!)
-      - 15672:15672
-    environment:
-      - RABBITMQ_DEFAULT_USER=rabbit
-      - RABBITMQ_DEFAULT_PASS=rabbit
-      - RABBITMQ_DEFAULT_VHOST=default
+  # rabbitmq:
+  #   image: rabbitmq:3-management
+  #   ports:
+  #     # management gui (not for production!)
+  #     - 15672:15672
+  #   environment:
+  #     - RABBITMQ_DEFAULT_USER=rabbit
+  #     - RABBITMQ_DEFAULT_PASS=rabbit
+  #     - RABBITMQ_DEFAULT_VHOST=default
   redis:
     image: redis:latest
   worker:

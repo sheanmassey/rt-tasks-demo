@@ -55,7 +55,8 @@
 
     const formattedTasks = () => {
         // return JSON.stringify(tasks, null, 2);
-        return tasks.map(t => `${t.id} - ${t.status}`).join("\n");
+        console.log(tasks);
+        return tasks.map(t => `${t.task_id} - ${t.status}`).join("\n");
     };
 
     const updateTasksElement = () => {
@@ -76,6 +77,8 @@
 
     socket.on("initial_data", (data) => {
         log("Received initial data");
+        // tasks = [ ...data ];
+        tasks.length = 0;
         tasks.push( ...data );
         updateTasksElement();
     });
@@ -83,7 +86,7 @@
     socket.on("task_update", (data) => {
         const { task_id, status } = data;
         log("Received task_update event");
-        const t = tasks.find(t => t.id === task_id);
+        const t = tasks.find(t => t.task_id === task_id);
         t.status = status;
         console.log("Task updated", t, data);
         updateTasksElement();
